@@ -11,10 +11,15 @@ app.use(express.json());
 const http = require('http');
 const server = http.createServer(app);
 const socket = require('socket.io');
+const { connect } = require('http2');
 const io = socket(server);
 
 io.on('connection', function (socket) {
-	console.log(socket.id);
+	console.log('New user connected');
+
+	socket.on('message', (message) => {
+		socket.broadcast.emit('message', message);
+	});
 });
 
 app.get('/', (req, res) => {

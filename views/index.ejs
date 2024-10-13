@@ -25,7 +25,7 @@
 					id="chat-input"
 					placeholder="Type your message..."
 					required />
-				<button type="submit">Send</button>
+				<button id="send-message" type="submit">Send</button>
 			</form>
 		</div>
 
@@ -40,6 +40,21 @@
 			crossorigin="anonymous"></script>
 		<script>
 			const socket = io();
+
+			const chatInput = document.querySelector('#chat-input');
+			const chatForm = document.querySelector('#chat-form');
+
+			chatForm.addEventListener('submit', (e) => {
+				e.preventDefault();
+				if (chatInput.value.trim().length > 0) {
+					socket.emit('message', chatInput.value);
+					chatInput.value = '';
+				}
+			});
+
+			socket.on('message', (message) => {
+				console.log(message);
+			});
 		</script>
 		<!-- <script>
 			const socket = io();
