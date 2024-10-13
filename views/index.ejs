@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Oh_megal</title>
+		<link rel="stylesheet" href="/css/style.css" />
+	</head>
+	<body>
+		<div id="incoming-call" style="display: none">
+			<p>Incoming call...</p>
+			<button id="accept-call">Accept</button>
+			<button id="reject-call">Reject</button>
+		</div>
+
+		<div id="header">
+			<h1>Oh_megal</h1>
+			<button id="video-call-btn">Start Video Call</button>
+		</div>
+		<div id="chat-container">
+			<div id="chat-messages"></div>
+			<form id="chat-form">
+				<input
+					type="text"
+					id="chat-input"
+					placeholder="Type your message..."
+					required />
+				<button type="submit">Send</button>
+			</form>
+		</div>
+
+		<div id="video-container">
+			<video id="remote-video" autoplay></video>
+			<video id="local-video" autoplay muted></video>
+		</div>
+
+		<script
+			src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+			integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO"
+			crossorigin="anonymous"></script>
+		<script>
+			const socket = io();
+		</script>
+		<!-- <script>
+			const socket = io();
+			const chatForm = document.getElementById('chat-form');
+			const chatInput = document.getElementById('chat-input');
+			const chatMessages = document.getElementById('chat-messages');
+
+			chatForm.addEventListener('submit', (e) => {
+				e.preventDefault();
+				if (chatInput.value) {
+					// Display the sent message locally
+					displayMessage(chatInput.value, 'sent');
+					// Send the message to the server
+					socket.emit('chat message', chatInput.value);
+					chatInput.value = '';
+				}
+			});
+
+			socket.on('chat message', (msg) => {
+				// Display received messages
+				displayMessage(msg, 'received');
+			});
+
+			function displayMessage(msg, type) {
+				const messageElement = document.createElement('div');
+				messageElement.textContent = msg;
+				messageElement.classList.add('message', type);
+				chatMessages.appendChild(messageElement);
+				chatMessages.scrollTop = chatMessages.scrollHeight;
+			}
+
+			const videoCallBtn = document.getElementById('video-call-btn');
+			const localVideo = document.getElementById('local-video');
+			const remoteVideo = document.getElementById('remote-video');
+			const videoContainer = document.getElementById('video-container');
+			let localStream;
+			let peerConnection;
+			let isCallInitiator = false;
+
+			const configuration = {
+				iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+			};
+
+			// Add this new function to handle permission requests
+			async function requestMediaPermissions() {
+				try {
+					await navigator.mediaDevices.getUserMedia({
+						audio: true,
+						video: true,
+					});
+					console.log('Permissions granted for audio and video');
+					return true;
+				} catch (error) {
+					console.error('Error requesting permissions:', error);
+					alert(
+						'Please grant permission to access your camera and microphone to start a video call.'
+					);
+					return false;
+				}
+			}
+
+			// Modify the videoCallBtn event listener
+			videoCallBtn.addEventListener('click', async () => {
+				console.log('Initiating call');
+				const permissionsGranted = await requestMediaPermissions();
+				if (permissionsGranted) {
+					isCallInitiator = true;
+					startVideoCall();
+					socket.emit('initiate-call');
+				}
+			});
+
+			// Modify the accept-call event listener
+			document
+				.getElementById('accept-call')
+				.addEventListener('click', async () => {
+					console.log('Call accepted');
+					const permissionsGranted = await requestMediaPermissions();
+					if (permissionsGranted) {
+						document.getElementById('incoming-call').style.display = 'none';
+						startVideoCall();
+					}
+				});
+
+			// Update the startVideoCall function
+			async function startVideoCall() {
+				console.log('Starting video call');
+				try {
+					if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+						throw new Error('getUserMedia is not supported in this browser');
+					}
+
+					localStream = await navigator.mediaDevices.getUserMedia({
+						video: true,
+						audio: true,
+					});
+					localVideo.srcObject = localStream;
+					console.log('Local stream obtained');
+
+					// Show video container immediately after getting local stream
+					videoContainer.style.display = 'block';
+
+					peerConnection = new RTCPeerConnection(configuration);
+
+					localStream.getTracks().forEach((track) => {
+						peerConnection.addTrack(track, localStream);
+					});
+
+					peerConnection.ontrack = (event) => {
+						console.log('Remote track received');
+						remoteVideo.srcObject = event.streams[0];
+					};
+
+					peerConnection.onicecandidate = (event) => {
+						if (event.candidate) {
+							console.log('Sending ICE candidate');
+							socket.emit('ice-candidate', event.candidate);
+						}
+					};
+
+					if (isCallInitiator) {
+						console.log('Creating and sending offer');
+						const offer = await peerConnection.createOffer();
+						await peerConnection.setLocalDescription(offer);
+						socket.emit('video-offer', offer);
+					}
+
+					console.log('Video container displayed');
+					videoContainer.style.display = 'block';
+				} catch (error) {
+					console.error('Error starting video call:', error);
+					alert(
+						'Failed to start video call. Please ensure you have granted camera/microphone permissions and are using a supported browser.'
+					);
+				}
+			}
+
+			socket.on('video-offer', async (offer) => {
+				console.log('Video offer received');
+				try {
+					if (!peerConnection) {
+						await startVideoCall();
+					}
+					await peerConnection.setRemoteDescription(
+						new RTCSessionDescription(offer)
+					);
+					const answer = await peerConnection.createAnswer();
+					await peerConnection.setLocalDescription(answer);
+					socket.emit('video-answer', answer);
+				} catch (error) {
+					console.error('Error handling video offer:', error);
+				}
+			});
+
+			socket.on('video-answer', async (answer) => {
+				console.log('Video answer received');
+				try {
+					await peerConnection.setRemoteDescription(
+						new RTCSessionDescription(answer)
+					);
+				} catch (error) {
+					console.error('Error handling video answer:', error);
+				}
+			});
+
+			socket.on('ice-candidate', async (candidate) => {
+				console.log('ICE candidate received');
+				if (peerConnection) {
+					await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+				}
+			});
+
+			socket.on('call-rejected', () => {
+				alert('Call was rejected');
+				// Reset any necessary states
+				isCallInitiator = false;
+				if (localStream) {
+					localStream.getTracks().forEach((track) => track.stop());
+				}
+				if (peerConnection) {
+					peerConnection.close();
+				}
+				videoContainer.style.display = 'none';
+			});
+		</script> -->
+	</body>
+</html>
