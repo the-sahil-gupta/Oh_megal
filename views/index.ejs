@@ -18,7 +18,10 @@
 			<button id="video-call-btn">Start Video Call</button>
 		</div>
 		<div id="chat-container">
-			<div id="chat-messages"></div>
+			<div id="chat-messages">
+				<div class="message received">hey</div>
+				<div class="message sent">hey</div>
+			</div>
 			<form id="chat-form">
 				<input
 					type="text"
@@ -43,6 +46,7 @@
 
 			const chatInput = document.querySelector('#chat-input');
 			const chatForm = document.querySelector('#chat-form');
+			const chatMessages = document.querySelector('#chat-messages');
 
 			chatForm.addEventListener('submit', (e) => {
 				e.preventDefault();
@@ -53,7 +57,7 @@
 			});
 
 			socket.on('message', (message) => {
-				console.log(message);
+				chatMessages.innerHTML += `<div class="message received">${message}</div>`;
 			});
 		</script>
 		<!-- <script>
